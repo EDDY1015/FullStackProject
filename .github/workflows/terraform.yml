@@ -58,7 +58,7 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ env.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
 
-      - name: **Manually Test SSH Connection**
+      - name: Manually Test SSH Connection
         run: |
           echo "Testing SSH connection to EC2..."
           ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_PUBLIC_IP }} "echo '✅ SSH Connection Successful'"
