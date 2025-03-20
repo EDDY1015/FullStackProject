@@ -40,16 +40,20 @@ jobs:
       - name: Get EC2 Public IP
         id: get_ip
         run: |
-          EC2_PUBLIC_IP=$(terraform output -raw geth_public_ip)
+          echo "Waiting for Terraform to output EC2 public IP..."
+          sleep 10  # Delay to ensure Terraform applies completely
+          terraform output
+          EC2_PUBLIC_IP=$(terraform output -raw geth_public_ip 2>/dev/null || echo "")
+          if [ -z "$EC2_PUBLIC_IP" ]; then
+            echo "ERROR: Terraform did not return an EC2 public IP."
+            exit 1
+          fi
           echo "EC2_PUBLIC_IP=$EC2_PUBLIC_IP" >> $GITHUB_ENV
-          echo "EC2 Public IP is $EC2_PUBLIC_IP"
+          echo "✅ EC2 Public IP: $EC2_PUBLIC_IP"
         working-directory: terraform
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - name: Debug EC2 Public IP
-        run: echo "EC2_PUBLIC_IP=${{ env.EC2_PUBLIC_IP }}"
 
   ansible:
     needs: terraform
@@ -60,32 +64,20 @@ jobs:
 
       - name: Install Ansible
         run: |
-          sudo apt update --allow-releaseinfo-change
           sudo apt update && sudo apt install -y ansible
-
-      - name: Debug EC2 Public IP Before Inventory
-        run: echo "EC2_PUBLIC_IP=${{ env.EC2_PUBLIC_IP }}"
-
-      - name: Ensure EC2 IP is Not Empty
-        run: |
-          if [ -z "${{ env.EC2_PUBLIC_IP }}" ]; then
-            echo "ERROR: EC2 Public IP is missing!"
-            exit 1
-          fi
-
-      - name: Setup SSH Private Key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          eval $(ssh-agent -s)
-          ssh-add ~/.ssh/id_rsa
 
       - name: Update Ansible Inventory with EC2 IP
         run: |
           echo "[ethereum]" > ansible/inventory.ini
           echo "${{ env.EC2_PUBLIC_IP }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory.ini
-          cat ansible/inventory.ini
+
+      - name: Set Up SSH Key for Ansible
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval "$(ssh-agent -s)"
+          ssh-add ~/.ssh/id_rsa
 
       - name: Run Ansible Playbook
         run: ansible-playbook -i ansible/inventory.ini ansible/setup.yml
