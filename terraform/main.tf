@@ -17,7 +17,6 @@ resource "aws_instance" "geth_node" {
   connection {
     type        = "ssh"
     user        = "ubuntu"
-    private_key = file("${path.module}/my-key.pem") 
     host        = self.public_ip
   }
 }
