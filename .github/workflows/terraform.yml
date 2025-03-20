@@ -61,7 +61,7 @@ jobs:
       - name: Update Ansible Inventory with EC2 IP
         run: |
           echo "[ethereum]" > ansible/inventory.ini
-          echo "${{ env.EC2_PUBLIC_IP }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/my-key.pem" >> ansible/inventory.ini
+          echo "${{ env.EC2_PUBLIC_IP }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/Lab1_GBC.pem" >> ansible/inventory.ini
 
       - name: Run Ansible Playbook
         run: ansible-playbook -i ansible/inventory.ini ansible/setup.yml
