@@ -59,12 +59,23 @@ jobs:
           sudo apt update
           sudo apt install -y ansible openssh-client
 
-      - name: Configure SSH Key
+      - name: Configure SSH Key (Debug)
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | sed 's/\r$//' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ needs.terraform.outputs.ec2_ip }} >> ~/.ssh/known_hosts
+    
+          echo "Checking EC2 IP:"
+          echo "${{ needs.terraform.outputs.ec2_ip }}"
+
+          echo "Testing if SSH port is reachable:"
+          nc -zv ${{ needs.terraform.outputs.ec2_ip }} 22
+
+          echo "Adding EC2 to known_hosts:"
+          ssh-keyscan -v -H ${{ needs.terraform.outputs.ec2_ip }} >> ~/.ssh/known_hosts
+
+          echo "Testing direct SSH Connection:"
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ needs.terraform.outputs.ec2_ip }} "echo SSH connection successful"
 
       - name: Verify SSH Connection
         run: |
