@@ -26,6 +26,7 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
 
       - name: Apply Terraform Configuration
         run: terraform apply -auto-approve
@@ -33,15 +34,23 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
 
       - name: Retrieve EC2 Public IP
         id: ec2_ip
         run: |
           EC2_IP=$(terraform output -raw geth_public_ip)
+          if [ -z "$EC2_IP" ]; then
+            echo "ERROR: EC2 Public IP is missing!"
+            exit 1
+          fi
           echo "EC2_PUBLIC_IP=$EC2_IP" >> $GITHUB_ENV
           echo "✅ EC2 Public IP: $EC2_IP"
-
         working-directory: terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
 
   ansible:
     needs: terraform
@@ -61,8 +70,6 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ env.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
-        env:
-          EC2_PUBLIC_IP: ${{ env.EC2_PUBLIC_IP }}
 
       - name: Verify SSH Connection
         run: |
@@ -95,3 +102,4 @@ jobs:
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
