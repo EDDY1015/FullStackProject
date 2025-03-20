@@ -1,5 +1,5 @@
 resource "aws_instance" "geth_node" {
-  ami           = "ami-0c55b159cbfafe1f0" # Ubuntu 22.04 (Free Tier)
+  ami           = "ami-04b4f1a9cf54c11d0"  # Ubuntu 24.04 LTS
   instance_type = var.instance_type
   key_name      = var.key_name
 
