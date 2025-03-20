@@ -9,7 +9,7 @@ on:
       - master
 
 jobs:
-    terraform:
+  terraform:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -40,18 +40,18 @@ jobs:
       - name: Get EC2 Public IP
         id: get_ip
         run: |
-          echo "EC2_PUBLIC_IP=$(terraform output -raw geth_public_ip)" >> $GITHUB_ENV
-          echo "EC2_PUBLIC_IP=$(terraform output -raw geth_public_ip)"
+          EC2_PUBLIC_IP=$(terraform output -raw geth_public_ip)
+          echo "EC2_PUBLIC_IP=$EC2_PUBLIC_IP" >> $GITHUB_ENV
+          echo "EC2 Public IP is $EC2_PUBLIC_IP"
         working-directory: terraform
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Debug EC2 Public IP
-        run: echo "EC2 Public IP is $EC2_PUBLIC_IP"
+        run: echo "EC2_PUBLIC_IP=${{ env.EC2_PUBLIC_IP }}"
 
-
-    ansible:
+  ansible:
     needs: terraform
     runs-on: ubuntu-latest
     steps:
