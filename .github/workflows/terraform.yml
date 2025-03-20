@@ -1,4 +1,4 @@
-name: CI/CD Pipeline for Blockchain Setup
+name: Terraform Deployment
 
 on:
   push:
@@ -38,8 +38,15 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Retrieve EC2 Public IP
-        id: ec2_ip
-        run: echo "EC2_PUBLIC_IP=$(terraform output -raw geth_public_ip)" >> $GITHUB_ENV
+        id: get_ip
+        run: |
+          EC2_IP=$(terraform output -raw geth_public_ip)
+          if [ -z "$EC2_IP" ]; then
+            echo "ERROR: geth_public_ip is empty!"
+            exit 1
+          fi
+          echo "::set-output name=public_ip::$EC2_IP"
+          echo "EC2 Public IP is $EC2_IP"
         working-directory: terraform
 
   ansible:
@@ -49,6 +56,9 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
+      - name: Get Public IP from Terraform Job
+        run: echo "EC2_PUBLIC_IP=${{ needs.terraform.outputs.get_ip.public_ip }}" >> $GITHUB_ENV
+
       - name: Install SSH & Ansible
         run: |
           sudo apt update
@@ -57,20 +67,21 @@ jobs:
       - name: Configure SSH Key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" | sed 's/\r$//' > ~/.ssh/id_rsa  # Ensure proper formatting
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | sed 's/\r$//' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ env.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
-        shell: /usr/bin/bash -e {0}h/known_hosts
+          echo "🔍 SSH Key configured"
 
       - name: Verify SSH Connection
         run: |
           echo "Testing SSH connection to EC2..."
-          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_PUBLIC_IP }} "echo '✅ SSH Connection Successful'"
+          ssh-keyscan -H $EC2_PUBLIC_IP >> ~/.ssh/known_hosts
+          ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "echo '✅ SSH Connection Successful'"
 
       - name: Generate Dynamic Ansible Inventory
         run: |
           echo "[ethereum]" > ansible/inventory.ini
-          echo "${{ env.EC2_PUBLIC_IP }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory.ini
+          echo "$EC2_PUBLIC_IP ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory.ini
+          cat ansible/inventory.ini
 
       - name: Run Ansible Playbook
         run: ansible-playbook -i ansible/inventory.ini ansible/setup.yml
