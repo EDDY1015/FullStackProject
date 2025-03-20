@@ -1,1 +1,3 @@
 .terraform/ # Ignore it in future commits
+.terraform/ # Ignore it in future commits
+.terraform/
