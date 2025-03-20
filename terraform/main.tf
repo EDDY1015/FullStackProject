@@ -13,7 +13,7 @@ resource "aws_instance" "geth_node" {
               EOF
 
   tags = {
-    Name = "GethNode"
+    Name = "GethNode_test"
   }
 }
 
