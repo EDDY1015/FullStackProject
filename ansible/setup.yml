@@ -1,7 +1,8 @@
----
 - name: Configure EC2 for Ethereum & Kubernetes
   hosts: all
   become: yes
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
   tasks:
 
     - name: Update and install required packages
@@ -11,29 +12,63 @@
           - curl
           - unzip
           - software-properties-common
+          - docker.io
+      async: 300
+      poll: 10
 
-    - name: Install Docker
-      shell: |
-        sudo apt update
-        sudo apt install -y docker.io
-        sudo systemctl start docker
-        sudo systemctl enable docker
-        sudo usermod -aG docker ubuntu
+    - name: Start Docker and enable it
+      systemd:
+        name: docker
+        state: started
+        enabled: yes
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
 
     - name: Install Ethereum Geth Node in Docker
-      shell: |
-        sudo docker run -d --name ethereum-node -p 8545:8545 -p 30303:30303 ethereum/client-go --http --http.addr "0.0.0.0" --http.api "eth,net,web3"
+      docker_container:
+        name: ethereum-node
+        image: ethereum/client-go
+        state: started
+        restart_policy: always
+        ports:
+          - "8545:8545"
+          - "30303:30303"
+        command: '--http --http.addr "0.0.0.0" --http.api "eth,net,web3"'
 
-    - name: Install Node.js and Hardhat
+    - name: Install Node.js (v16) and npm
       shell: |
         curl -fsSL https://deb.nodesource.com/setup_16.x | sudo -E bash -
         sudo apt install -y nodejs
-        sudo npm install -g hardhat
+      args:
+        executable: /bin/bash
+
+    - name: Install Hardhat globally using npm
+      npm:
+        name: hardhat
+        global: yes
 
     - name: Install Kubernetes (K3s)
       shell: |
         curl -sfL https://get.k3s.io | sh -
+      args:
+        executable: /bin/bash
+
+    - name: Ensure kubectl is available
+      shell: |
+        sudo ln -sf /usr/local/bin/k3s /usr/local/bin/kubectl
+
+    - name: Wait for Kubernetes to be ready
+      shell: |
+        kubectl wait --for=condition=ready nodes --all --timeout=300s
+      args:
+        executable: /bin/bash
 
     - name: Deploy Vault on Kubernetes
       shell: |
-        kubectl apply -f https://raw.githubusercontent.com/hashicorp/vault-k8s/main/deploy/vault.yaml
+        kubectl apply -f https://raw.githubusercontent.com/hashicorp/vault-k8s/main/deploy/operator.yaml
+      args:
+        executable: /bin/bash
