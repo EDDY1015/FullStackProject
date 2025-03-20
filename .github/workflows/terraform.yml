@@ -9,9 +9,10 @@ on:
       - master
 
 jobs:
-  terraform:
+  terraform_and_ansible:
     runs-on: ubuntu-latest
     steps:
+      # 1️⃣ EXACT TERRAFORM STEPS (unchanged)
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -37,28 +38,21 @@ jobs:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
+      # 2️⃣ RETRIEVE EC2 PUBLIC IP
       - name: Retrieve EC2 Public IP
-        id: get_ip
         run: |
+          echo "Retrieving EC2 Public IP..."
+          # Output must exist from your main.tf: output \"geth_public_ip\" { ... }
           EC2_IP=$(terraform output -raw geth_public_ip)
           if [ -z "$EC2_IP" ]; then
-            echo "ERROR: geth_public_ip is empty!"
+            echo "ERROR: geth_public_ip output is empty!"
             exit 1
           fi
-          echo "::set-output name=public_ip::$EC2_IP"
-          echo "EC2 Public IP is $EC2_IP"
+          echo "✅ EC2_PUBLIC_IP=$EC2_IP"
+          echo "EC2_PUBLIC_IP=$EC2_IP" >> $GITHUB_ENV
         working-directory: terraform
 
-  ansible:
-    needs: terraform
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-
-      - name: Get Public IP from Terraform Job
-        run: echo "EC2_PUBLIC_IP=${{ needs.terraform.outputs.get_ip.public_ip }}" >> $GITHUB_ENV
-
+      # 3️⃣ INSTALL & RUN ANSIBLE STEPS
       - name: Install SSH & Ansible
         run: |
           sudo apt update
@@ -69,18 +63,19 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | sed 's/\r$//' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          echo "🔍 SSH Key configured"
+          # Add the EC2 host to known_hosts (disable StrictHostKeyChecking)
+          ssh-keyscan -H ${{ env.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
 
       - name: Verify SSH Connection
         run: |
           echo "Testing SSH connection to EC2..."
-          ssh-keyscan -H $EC2_PUBLIC_IP >> ~/.ssh/known_hosts
-          ssh -o StrictHostKeyChecking=no ubuntu@$EC2_PUBLIC_IP "echo '✅ SSH Connection Successful'"
+          ssh -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_PUBLIC_IP }} "echo '✅ SSH Connection Successful'"
 
       - name: Generate Dynamic Ansible Inventory
         run: |
           echo "[ethereum]" > ansible/inventory.ini
-          echo "$EC2_PUBLIC_IP ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory.ini
+          echo "${{ env.EC2_PUBLIC_IP }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory.ini
+          echo "✅ Dynamic inventory created!"
           cat ansible/inventory.ini
 
       - name: Run Ansible Playbook
