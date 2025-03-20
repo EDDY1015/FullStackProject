@@ -61,9 +61,24 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | sed 's/\r$//' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      - name: Strictly Add EC2 IP to known_hosts (critical fix!)
+      - name: Strictly Add EC2 IP to known_hosts (with Debugging)
         run: |
-          ssh-keyscan -H -t rsa ${{ env.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
+          mkdir -p ~/.ssh
+          echo "Checking EC2 IP:"
+          echo "${{ env.EC2_PUBLIC_IP }}"
+
+          echo "Testing if SSH port is reachable:"
+          nc -vz ${{ env.EC2_PUBLIC_IP }} 22
+
+          echo "Trying ssh-keyscan with debug output:"
+          ssh-keyscan -vvv -t rsa ${{ env.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts || true
+
+          echo "Contents of known_hosts:"
+          cat ~/.ssh/known_hosts
+
+          echo "Trying manual SSH connection (debugging):"
+          ssh -vvv -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_PUBLIC_IP }} "echo SSH debugging successful" || true
+
 
       - name: Debug SSH Connection (optional but recommended)
         run: |
