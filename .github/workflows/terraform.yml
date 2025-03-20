@@ -56,20 +56,20 @@ jobs:
           sudo apt update
           sudo apt install -y ansible openssh-client
 
-      - name: Configure SSH Key (Stable)
+      - name: Configure SSH Key (Bypass ssh-keyscan)
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | sed 's/\r$//' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -t rsa -p 22 ${{ needs.terraform.outputs.ec2_ip }} >> ~/.ssh/known_hosts
 
       - name: Generate Dynamic Ansible Inventory
         run: |
           echo "[ethereum]" > ansible/inventory.ini
           echo "${{ needs.terraform.outputs.ec2_ip }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory.ini
 
-      - name: Run Ansible Playbook
-        run: ansible-playbook -i ansible/inventory.ini ansible/setup.yml
+      - name: Run Ansible Playbook (No Host Checking)
+        run: |
+          ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i ansible/inventory.ini ansible/setup.yml
 
   destroy:
     if: github.event_name == 'delete' && github.event.ref == 'refs/heads/master'
