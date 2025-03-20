@@ -26,6 +26,9 @@ jobs:
       - name: Initialize Terraform
         run: terraform init
         working-directory: terraform
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Apply Terraform Configuration
         run: terraform apply -auto-approve
@@ -35,7 +38,7 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
   destroy:
-    if: github.event_name == 'delete' && github.event.ref == 'refs/heads/main'
+    if: github.event_name == 'delete' && github.event.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
