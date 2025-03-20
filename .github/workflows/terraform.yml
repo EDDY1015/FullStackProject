@@ -1,4 +1,4 @@
-name: CI/CD Pipeline for Blockchain Setup
+name: Terraform & Ansible CI/CD
 
 on:
   push:
@@ -12,62 +12,73 @@ jobs:
   terraform:
     runs-on: ubuntu-latest
     outputs:
-      ec2_ip: ${{ steps.ec2_ip.outputs.ec2_public_ip }}
+      EC2_PUBLIC_IP: ${{ steps.get_ip.outputs.ip }}
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Terraform
+      - name: Terraform Setup
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.5
 
-      - name: Initialize Terraform
-        run: terraform init
+      - name: Terraform Init & Apply
         working-directory: terraform
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          terraform init
+          terraform apply -auto-approve
 
-      - name: Apply Terraform Configuration
-        run: terraform apply -auto-approve
+      - name: Output EC2 Public IP
+        id: get_ip
         working-directory: terraform
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
-      - name: Retrieve EC2 Public IP
-        id: ec2_ip
-        run: echo "ec2_public_ip=$(terraform output -raw geth_public_ip)" >> "$GITHUB_OUTPUT"
-        working-directory: terraform
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          IP=$(terraform output -raw geth_public_ip)
+          echo "ip=$IP" >> $GITHUB_OUTPUT
 
   ansible:
     needs: terraform
     runs-on: ubuntu-latest
+    env:
+      EC2_PUBLIC_IP: ${{ needs.terraform.outputs.EC2_PUBLIC_IP }}
     steps:
-      - name: Checkout Repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install Ansible & SSH Client
+      - name: Install Ansible
         run: |
           sudo apt update
-          sudo apt install -y ansible openssh-client
+          sudo apt install -y ansible
 
-      - name: Configure SSH Key (Bypass ssh-keyscan)
+      - name: Setup SSH Key
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | sed 's/\r$//' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      - name: Generate Dynamic Ansible Inventory
+      - name: Strictly Add EC2 IP to known_hosts (critical fix!)
+        run: |
+          ssh-keyscan -H -t rsa ${{ env.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
+
+      - name: Debug SSH Connection (optional but recommended)
+        run: |
+          ssh -vvv -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_PUBLIC_IP }} "echo ✅ SSH Works!"
+
+      - name: Generate Dynamic Inventory File
         run: |
           echo "[ethereum]" > ansible/inventory.ini
-          echo "${{ needs.terraform.outputs.ec2_ip }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory.ini
+          echo "${{ env.EC2_PUBLIC_IP }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory.ini
 
-      - name: Run Ansible Playbook (No Host Checking)
+      - name: Wait for SSH (Ansible)
+        run: |
+          ansible -i ansible/inventory.ini ethereum -m wait_for_connection -a "timeout=180"
+
+      - name: Run Ansible Playbook
         run: |
           ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i ansible/inventory.ini ansible/setup.yml
 
@@ -75,17 +86,17 @@ jobs:
     if: github.event_name == 'delete' && github.event.ref == 'refs/heads/master'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.5
 
-      - name: Destroy Infrastructure
-        run: terraform destroy -auto-approve
+      - name: Terraform Destroy
         working-directory: terraform
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          terraform init
+          terraform destroy -auto-approve
