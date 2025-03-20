@@ -52,16 +52,23 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Fix Repository Issues and Install Ansible
+      - name: Install Ansible
         run: |
-          sudo rm -rf /var/lib/apt/lists/*
           sudo apt update --allow-releaseinfo-change
           sudo apt update && sudo apt install -y ansible
+
+      - name: Setup SSH Private Key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
 
       - name: Update Ansible Inventory with EC2 IP
         run: |
           echo "[ethereum]" > ansible/inventory.ini
-          echo "${{ env.EC2_PUBLIC_IP }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/Lab1_GBC.pem" >> ansible/inventory.ini
+          echo "${{ env.EC2_PUBLIC_IP }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory.ini
 
       - name: Run Ansible Playbook
         run: ansible-playbook -i ansible/inventory.ini ansible/setup.yml
