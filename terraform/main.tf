@@ -5,7 +5,7 @@ resource "aws_instance" "geth_node" {
 
 
   tags = {
-    Name = "GethNode"
+    Name = "GethNode1"
   }
 }
 
