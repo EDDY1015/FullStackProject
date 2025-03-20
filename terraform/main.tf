@@ -3,17 +3,9 @@ resource "aws_instance" "geth_node" {
   instance_type = var.instance_type
   key_name      = var.key_name
 
-  user_data = <<-EOF
-              #!/bin/bash
-              sudo apt update -y
-              sudo apt install -y docker.io
-              sudo systemctl start docker
-              sudo systemctl enable docker
-              sudo usermod -aG docker ubuntu
-              EOF
 
   tags = {
-    Name = "GethNode_test"
+    Name = "GethNode"
   }
 }
 
