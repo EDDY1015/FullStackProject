@@ -52,8 +52,11 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Install Ansible
-        run: sudo apt update && sudo apt install -y ansible
+      - name: Fix Repository Issues and Install Ansible
+        run: |
+          sudo rm -rf /var/lib/apt/lists/*
+          sudo apt update --allow-releaseinfo-change
+          sudo apt update && sudo apt install -y ansible
 
       - name: Update Ansible Inventory with EC2 IP
         run: |
