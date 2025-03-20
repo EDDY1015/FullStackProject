@@ -9,7 +9,7 @@ on:
       - master
 
 jobs:
-  terraform:
+    terraform:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -38,14 +38,20 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
       - name: Get EC2 Public IP
-        id: ec2_ip
-        run: echo "EC2_PUBLIC_IP=$(terraform output -raw geth_public_ip)" >> $GITHUB_ENV
+        id: get_ip
+        run: |
+          echo "EC2_PUBLIC_IP=$(terraform output -raw geth_public_ip)" >> $GITHUB_ENV
+          echo "EC2_PUBLIC_IP=$(terraform output -raw geth_public_ip)"
         working-directory: terraform
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-  ansible:
+      - name: Debug EC2 Public IP
+        run: echo "EC2 Public IP is $EC2_PUBLIC_IP"
+
+
+    ansible:
     needs: terraform
     runs-on: ubuntu-latest
     steps:
@@ -57,6 +63,16 @@ jobs:
           sudo apt update --allow-releaseinfo-change
           sudo apt update && sudo apt install -y ansible
 
+      - name: Debug EC2 Public IP Before Inventory
+        run: echo "EC2_PUBLIC_IP=${{ env.EC2_PUBLIC_IP }}"
+
+      - name: Ensure EC2 IP is Not Empty
+        run: |
+          if [ -z "${{ env.EC2_PUBLIC_IP }}" ]; then
+            echo "ERROR: EC2 Public IP is missing!"
+            exit 1
+          fi
+
       - name: Setup SSH Private Key
         run: |
           mkdir -p ~/.ssh
@@ -64,9 +80,6 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           eval $(ssh-agent -s)
           ssh-add ~/.ssh/id_rsa
-
-      - name: Debug EC2 Public IP
-        run: echo "EC2_PUBLIC_IP=${{ env.EC2_PUBLIC_IP }}"
 
       - name: Update Ansible Inventory with EC2 IP
         run: |
