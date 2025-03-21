@@ -57,10 +57,24 @@
         state: link
         force: yes
 
-    - name: Deploy Hashicorp Vault on Kubernetes
+    - name: Install Helm
       shell: |
-        kubectl apply -f https://raw.githubusercontent.com/hashicorp/vault-k8s/main/deploy/vault-operator.yaml
-      register: vault_status
-      retries: 3
-      delay: 10
-      until: vault_status.rc == 0
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
+
+    - name: Add HashiCorp Helm repository
+      shell: helm repo add hashicorp https://helm.releases.hashicorp.com
+      args:
+        creates: /root/.cache/helm/repository/hashicorp-index.yaml
+
+    - name: Update Helm repositories
+      shell: helm repo update
+
+    - name: Create vault namespace
+      shell: kubectl create namespace vault || true
+
+    - name: Deploy Vault via Helm
+      shell: |
+        helm install vault hashicorp/vault --namespace vault --set "server.dev.enabled=true"
+
