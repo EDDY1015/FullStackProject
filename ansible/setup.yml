@@ -9,16 +9,11 @@
         seconds: 10
 
   tasks:
-    - name: Install essential packages
+    - name: Install Docker
       apt:
-        name:
-          - curl
-          - unzip
-          - software-properties-common
-          - docker.io
+        name: docker.io
         state: present
         update_cache: yes
-        force_apt_get: yes
       environment:
         DEBIAN_FRONTEND: noninteractive
 
@@ -53,9 +48,11 @@
         DEBIAN_FRONTEND: noninteractive
 
     - name: Install Hardhat globally
-      shell: npm install -g hardhat
+      npm:
+        name: hardhat
+        global: yes
 
-    - name: Install Kubernetes (K3s - lightweight)
+    - name: Install K3s (Kubernetes lightweight)
       shell: |
         curl -sfL https://get.k3s.io | sh -
       args:
@@ -68,39 +65,35 @@
         state: link
         force: yes
 
-    - name: Install Helm
-      shell: |
-        curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
-
-    - name: Add HashiCorp Helm repository
-      shell: helm repo add hashicorp https://helm.releases.hashicorp.com
-
-    - name: Update Helm repositories
-      shell: helm repo update
-
     - name: Wait for Kubernetes API to become available
       shell: |
-        for i in {1..30}; do
-          if kubectl get nodes &>/dev/null; then
-            echo "✅ Kubernetes is ready!"
-            exit 0
-          fi
-          echo "⏳ Waiting for Kubernetes API... ($i/30)"
-          sleep 10
+        for i in {1..20}; do
+          kubectl get nodes && exit 0
+          echo "Waiting for Kubernetes API..."
+          sleep 15
         done
-        echo "❌ Kubernetes API did not respond in time."
         exit 1
-      register: k3s_ready
-      failed_when: k3s_ready.rc != 0
-
-    - name: Create vault namespace
-      shell: |
-        kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
-
-    - name: Deploy Vault via Helm
-      shell: |
-        helm install vault hashicorp/vault --namespace vault --set "server.dev.enabled=true"
-      register: vault_deploy
+      register: kube_ready
       retries: 3
       delay: 10
-      until: vault_deploy.rc == 0
+      until: kube_ready.rc == 0
+
+    - name: Install Helm
+      shell: |
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+    - name: Add HashiCorp Helm repo
+      shell: helm repo add hashicorp https://helm.releases.hashicorp.com
+
+    - name: Update Helm repos
+      shell: helm repo update
+
+    - name: Create vault namespace
+      shell: kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Deploy Vault via Helm (Dev Mode)
+      shell: helm install vault hashicorp/vault --namespace vault --set "server.dev.enabled=true"
+      register: vault_result
+      retries: 3
+      delay: 15
+      until: vault_result.rc == 0
