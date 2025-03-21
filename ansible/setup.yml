@@ -73,7 +73,7 @@
 
     - name: Deploy Placeholder App on K3s
       copy:
-        src: k8s/k8s.yaml
+        src: ../k8s/k8s.yaml
         dest: /home/ubuntu/k8s.yaml
         mode: '0644'
 
