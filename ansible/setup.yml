@@ -70,3 +70,13 @@
         dest: /usr/local/bin/kubectl
         state: link
         force: yes
+
+    - name: Deploy Placeholder App on K3s
+      copy:
+        src: k8s/k8s.yaml
+        dest: /home/ubuntu/k8s.yaml
+        mode: '0644'
+
+    - name: Apply K8s manifest using kubectl
+      shell: |
+        kubectl apply -f /home/ubuntu/k8s.yaml
