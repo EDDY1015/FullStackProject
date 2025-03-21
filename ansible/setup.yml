@@ -1,74 +1,32 @@
 - name: Configure EC2 for Ethereum & Kubernetes
   hosts: all
   become: true
+  become_method: sudo
+  become_user: root
   gather_facts: false
 
   pre_tasks:
-    - name: Wait for SSH to be available
+    - name: Wait 30 seconds before connecting (instance stabilization)
+      pause:
+        seconds: 30
+
+    - name: Wait until SSH is available (extended timeout)
       wait_for_connection:
-        timeout: 300
+        timeout: 600  # Increased timeout
         delay: 10
 
   tasks:
-    - name: Install essential packages
+    - name: Basic stability check
+      shell: uptime
+
+    - name: Simple Docker install
       apt:
-        name:
-          - curl
-          - unzip
-          - software-properties-common
-          - docker.io
+        name: docker.io
         state: present
         update_cache: yes
-        force_apt_get: yes
-      environment:
-        DEBIAN_FRONTEND: noninteractive
 
-    - name: Start and enable Docker
+    - name: Start Docker service
       systemd:
         name: docker
         state: started
-        enabled: true
-
-    - name: Add ubuntu user to docker group
-      user:
-        name: ubuntu
-        groups: docker
-        append: yes
-
-    - name: Deploy Ethereum Geth Node container
-      shell: |
-        docker run -d --name ethereum-node \
-        -p 8545:8545 -p 30303:30303 \
-        ethereum/client-go \
-        --http --http.addr "0.0.0.0" --http.api "eth,net,web3"
-      args:
-        creates: /var/lib/docker/containers/ethereum-node
-
-    - name: Install Node.js (16.x) and npm global packages (Hardhat)
-      shell: |
-        curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
-        apt-get install -y nodejs
-        npm install -g hardhat
-      environment:
-        DEBIAN_FRONTEND: noninteractive
-
-    - name: Install Kubernetes (K3s - lightweight)
-      shell: |
-        curl -sfL https://get.k3s.io | sh -
-      args:
-        creates: /usr/local/bin/k3s
-
-    - name: Link kubectl binary
-      file:
-        src: /usr/local/bin/k3s
-        dest: /usr/local/bin/kubectl
-        state: link
-        force: yes
-
-    - name: Deploy Hashicorp Vault operator on Kubernetes
-      shell: |
-        kubectl apply -f https://raw.githubusercontent.com/hashicorp/vault-k8s/main/deploy/vault-operator.yaml
-      retries: 5
-      delay: 15
-      register: vault_status
-      until: vault_status.rc == 0
+        enabled: yes
