@@ -4,12 +4,11 @@
   gather_facts: false
 
   pre_tasks:
-    - name: Wait 5 seconds before connecting (instance stabilization)
+    - name: Wait 10 seconds before connecting (instance stabilization)
       pause:
         seconds: 10
 
   tasks:
-
     - name: Simple Docker install
       apt:
         name: docker.io
@@ -34,3 +33,14 @@
           - "8545:8545"
           - "30303:30303"
         command: '--http --http.addr "0.0.0.0" --http.api "eth,net,web3"'
+
+    - name: Install Node.js (16.x)
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
+        apt-get install -y nodejs
+      environment:
+        DEBIAN_FRONTEND: noninteractive
+
+    - name: Install Hardhat globally
+      shell: |
+        npm install -g hardhat
