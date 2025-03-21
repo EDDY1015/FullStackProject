@@ -10,7 +10,7 @@
 
     - name: Wait until SSH is available (extended timeout)
       wait_for_connection:
-        timeout: 300  # Increased timeout
+        timeout: 60  # Increased timeout
         delay: 10
 
   tasks:
