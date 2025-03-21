@@ -9,8 +9,6 @@
         seconds: 15
 
   tasks:
-    - name: Basic stability check
-      shell: uptime
 
     - name: Simple Docker install
       apt:
