@@ -13,6 +13,9 @@
       apt:
         upgrade: dist
         update_cache: yes
+        force_apt_get: yes
+      environment:
+        DEBIAN_FRONTEND: noninteractive
       register: apt_result
       retries: 3
       delay: 30
@@ -26,11 +29,17 @@
           - software-properties-common
         state: present
         update_cache: yes
+        force_apt_get: yes
+      environment:
+        DEBIAN_FRONTEND: noninteractive
 
     - name: Install Docker (stable approach)
       apt:
         name: docker.io
         state: present
+        force_apt_get: yes
+      environment:
+        DEBIAN_FRONTEND: noninteractive
       notify: 
         - enable docker service
         - add ubuntu user to docker group
@@ -51,6 +60,8 @@
         curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
         apt-get install -y nodejs
         npm install -g hardhat
+      environment:
+        DEBIAN_FRONTEND: noninteractive
 
     - name: Install Kubernetes (K3s - lightweight)
       shell: |
@@ -63,13 +74,14 @@
         src: /usr/local/bin/k3s
         dest: /usr/local/bin/kubectl
         state: link
+        force: yes
 
     - name: Deploy Vault on Kubernetes (using stable manifest)
       shell: |
         kubectl apply -f https://raw.githubusercontent.com/hashicorp/vault-k8s/main/deploy/vault-operator.yaml
+      register: vault_deploy
       retries: 3
       delay: 10
-      register: vault_deploy
       until: vault_deploy.rc == 0
 
   handlers:
