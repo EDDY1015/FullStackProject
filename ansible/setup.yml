@@ -1,8 +1,6 @@
 - name: Configure EC2 for Ethereum & Kubernetes
   hosts: all
-  become: true
-  become_method: sudo
-  become_user: root
+  become: false
   gather_facts: false
 
   pre_tasks:
@@ -12,7 +10,7 @@
 
     - name: Wait until SSH is available (extended timeout)
       wait_for_connection:
-        timeout: 600  # Increased timeout
+        timeout: 300  # Increased timeout
         delay: 10
 
   tasks:
