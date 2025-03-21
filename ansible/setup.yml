@@ -6,12 +6,7 @@
   pre_tasks:
     - name: Wait 30 seconds before connecting (instance stabilization)
       pause:
-        seconds: 30
-
-    - name: Wait until SSH is available (extended timeout)
-      wait_for_connection:
-        timeout: 60  # Increased timeout
-        delay: 10
+        seconds: 15
 
   tasks:
     - name: Basic stability check
