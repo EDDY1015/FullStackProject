@@ -44,7 +44,7 @@
     - name: Install Hardhat globally
       shell: |
         npm install -g hardhat
-        - name: Install Kubernetes (K3s)
+    - name: Install Kubernetes (K3s)
       shell: |
         curl -sfL https://get.k3s.io | sh -
       args:
