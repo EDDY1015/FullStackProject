@@ -1,4 +1,4 @@
-- name: Configure EC2 for Ethereum & Minikube + Vault
+- name: Configure EC2 for Ethereum & K3s
   hosts: all
   become: true
   gather_facts: false
@@ -9,17 +9,15 @@
         seconds: 10
 
   tasks:
-    - name: Install dependencies
+    - name: Install essential packages
       apt:
         name:
           - curl
           - unzip
           - docker.io
-          - conntrack
-          - socat
-          - ebtables
           - apt-transport-https
           - ca-certificates
+          - gnupg
         state: present
         update_cache: yes
       environment:
@@ -37,7 +35,7 @@
         groups: docker
         append: yes
 
-    - name: Run Ethereum Geth Node in Docker
+    - name: Deploy Ethereum Geth Node in Docker
       docker_container:
         name: ethereum-node
         image: ethereum/client-go
@@ -60,37 +58,15 @@
         name: hardhat
         global: yes
 
-    - name: Install Minikube
+    - name: Install K3s Kubernetes
       shell: |
-        curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-        install minikube-linux-amd64 /usr/local/bin/minikube
+        curl -sfL https://get.k3s.io | sh -
       args:
-        creates: /usr/local/bin/minikube
+        creates: /usr/local/bin/k3s
 
-    - name: Start Minikube
-      shell: minikube start --driver=docker
-      environment:
-        CHANGE_MINIKUBE_NONE_USER: "true"
-
-    - name: Install Helm
-      shell: |
-        curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
-      args:
-        creates: /usr/local/bin/helm
-
-    - name: Add HashiCorp Helm repo
-      shell: helm repo add hashicorp https://helm.releases.hashicorp.com
-
-    - name: Update Helm repos
-      shell: helm repo update
-
-    - name: Create Vault namespace
-      shell: kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
-
-    - name: Install Vault using Helm (dev mode)
-      shell: |
-        helm install vault hashicorp/vault --namespace vault \
-        --set "server.dev.enabled=true"
-
-    - name: Confirm Vault Pods Running
-      shell: kubectl get pods -n vault
+    - name: Symlink K3s as kubectl
+      file:
+        src: /usr/local/bin/k3s
+        dest: /usr/local/bin/kubectl
+        state: link
+        force: yes
