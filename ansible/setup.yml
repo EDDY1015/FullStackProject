@@ -4,7 +4,7 @@
   gather_facts: false
 
   pre_tasks:
-    - name: Waiting for EC2 to stabilize
+    - name: Wait for EC2 to stabilize
       pause:
         seconds: 15
 
