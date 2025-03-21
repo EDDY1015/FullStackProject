@@ -1,12 +1,12 @@
 - name: Configure EC2 for Ethereum & Kubernetes
   hosts: all
-  become: false
+  become: true
   gather_facts: false
 
   pre_tasks:
-    - name: Wait 30 seconds before connecting (instance stabilization)
+    - name: Wait 5 seconds before connecting (instance stabilization)
       pause:
-        seconds: 15
+        seconds: 10
 
   tasks:
 
@@ -15,6 +15,8 @@
         name: docker.io
         state: present
         update_cache: yes
+      environment:
+        DEBIAN_FRONTEND: noninteractive
 
     - name: Start Docker service
       systemd:
