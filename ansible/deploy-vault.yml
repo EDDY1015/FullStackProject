@@ -1,0 +1,31 @@
+- name: Deploy Vault in K3s Cluster
+  hosts: all
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Wait for Kubernetes to be ready
+      shell: |
+        kubectl get nodes
+      register: k8s_ready
+      retries: 5
+      delay: 15
+      until: k8s_ready.rc == 0
+
+    - name: Create Vault namespace
+      shell: kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Add HashiCorp Helm repo
+      shell: helm repo add hashicorp https://helm.releases.hashicorp.com
+
+    - name: Update Helm repos
+      shell: helm repo update
+
+    - name: Install Vault using Helm (dev mode)
+      shell: |
+        helm install vault hashicorp/vault \
+          --namespace vault \
+          --set "server.dev.enabled=true"
+
+    - name: Confirm Vault pods are running
+      shell: kubectl get pods -n vault
