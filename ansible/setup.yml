@@ -4,24 +4,36 @@
   gather_facts: false
 
   pre_tasks:
-    - name: Wait 10 seconds for EC2 instance to stabilize
+    - name: Wait 10 seconds before connecting (instance stabilization)
       pause:
         seconds: 10
 
   tasks:
-    - name: Install Docker
+
+    - name: Install required packages
       apt:
-        name: docker.io
+        name:
+          - curl
+          - unzip
+          - software-properties-common
+          - docker.io
         state: present
         update_cache: yes
+        force_apt_get: yes
       environment:
         DEBIAN_FRONTEND: noninteractive
 
-    - name: Start Docker service
+    - name: Start and enable Docker
       systemd:
         name: docker
         state: started
-        enabled: yes
+        enabled: true
+
+    - name: Add ubuntu user to docker group
+      user:
+        name: ubuntu
+        groups: docker
+        append: yes
 
     - name: Run Ethereum Geth Node in Docker
       community.docker.docker_container:
@@ -45,7 +57,7 @@
       shell: |
         npm install -g hardhat
 
-    - name: Install Kubernetes (K3s)
+    - name: Install Kubernetes (K3s - lightweight)
       shell: |
         curl -sfL https://get.k3s.io | sh -
       args:
@@ -58,36 +70,40 @@
         state: link
         force: yes
 
-    - name: Wait for K3s Kubernetes API to be ready
-      shell: |
-        for i in {1..30}; do
-          kubectl version --short && break
-          echo "⏳ Waiting for Kubernetes to be ready..."
-          sleep 10
-        done
-      register: k8s_ready
-      failed_when: k8s_ready.rc != 0
-
     - name: Install Helm
       shell: |
-        curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
     - name: Add HashiCorp Helm repository
-      shell: |
-        helm repo add hashicorp https://helm.releases.hashicorp.com
+      shell: helm repo add hashicorp https://helm.releases.hashicorp.com
 
     - name: Update Helm repositories
-      shell: |
-        helm repo update
+      shell: helm repo update
 
     - name: Create vault namespace
+      shell: kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
+
+    - name: Wait for K3s to become ready
       shell: |
-        kubectl create namespace vault || true
+        echo "⏳ Waiting for K3s to be ready..."
+        for i in {1..30}; do
+          if kubectl get nodes &> /dev/null; then
+            echo "✅ K3s is ready!"
+            exit 0
+          else
+            echo "Still waiting... attempt $i"
+            sleep 10
+          fi
+        done
+        echo "❌ K3s did not become ready in time"
+        exit 1
+      register: k3s_ready
+      failed_when: k3s_ready.rc != 0
 
     - name: Deploy Vault via Helm
       shell: |
         helm install vault hashicorp/vault --namespace vault --set "server.dev.enabled=true"
-      register: vault_deploy
+      register: vault_helm
       retries: 3
-      delay: 10
-      until: vault_deploy.rc == 0
+      delay: 15
+      until: vault_helm.rc == 0
