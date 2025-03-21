@@ -1,4 +1,4 @@
-- name: Configure EC2 for Ethereum & K3s
+- name: Configure EC2 
   hosts: all
   become: true
   gather_facts: false
