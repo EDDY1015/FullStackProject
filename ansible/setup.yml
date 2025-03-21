@@ -1,4 +1,4 @@
-- name: Configure EC2 instance 
+- name: Configuring EC2 instance 
   hosts: all
   become: true
   gather_facts: false
