@@ -1,4 +1,4 @@
-- name: Configure EC2 instance and K3s
+- name: Configure EC2 instance 
   hosts: all
   become: true
   gather_facts: false
