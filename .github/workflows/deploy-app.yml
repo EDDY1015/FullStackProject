@@ -1,4 +1,4 @@
-name: Deploy App on K3s
+name: Deploy the App on K3s
 
 on:
   workflow_run:
