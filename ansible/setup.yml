@@ -35,17 +35,6 @@
         groups: docker
         append: yes
 
-    - name: Deploy Ethereum Geth Node in Docker
-      docker_container:
-        name: ethereum-node
-        image: ethereum/client-go
-        state: started
-        restart_policy: always
-        published_ports:
-          - "8545:8545"
-          - "30303:30303"
-        command: '--http --http.addr "0.0.0.0" --http.api "eth,net,web3"'
-
     - name: Install Node.js (16.x)
       shell: |
         curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
@@ -71,7 +60,7 @@
         state: link
         force: yes
 
-    - name: Deploy Placeholder App on K3s
+    - name: Deploy App on K3s
       copy:
         src: ../app/fundraiser.yaml
         dest: /home/ubuntu/fundraiser.yaml
