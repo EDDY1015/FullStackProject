@@ -44,3 +44,23 @@
     - name: Install Hardhat globally
       shell: |
         npm install -g hardhat
+        - name: Install Kubernetes (K3s)
+      shell: |
+        curl -sfL https://get.k3s.io | sh -
+      args:
+        creates: /usr/local/bin/k3s
+
+    - name: Symlink kubectl for ease of use
+      file:
+        src: /usr/local/bin/k3s
+        dest: /usr/local/bin/kubectl
+        state: link
+        force: yes
+
+    - name: Deploy Hashicorp Vault on Kubernetes
+      shell: |
+        kubectl apply -f https://raw.githubusercontent.com/hashicorp/vault-k8s/main/deploy/vault-operator.yaml
+      register: vault_status
+      retries: 3
+      delay: 10
+      until: vault_status.rc == 0
