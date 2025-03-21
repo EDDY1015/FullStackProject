@@ -1,4 +1,4 @@
-name: Deploy Placeholder App to K3s
+name: Deploy Placeholder App
 
 on:
   workflow_run:
