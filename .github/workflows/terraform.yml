@@ -17,7 +17,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Terraform Setup
+      - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.5
@@ -60,38 +60,12 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" | sed 's/\r$//' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-
-      - name: Strictly Add EC2 IP to known_hosts (with Debugging)
-        run: |
-          mkdir -p ~/.ssh
-          echo "Checking EC2 IP:"
-          echo "${{ env.EC2_PUBLIC_IP }}"
-
-          echo "Testing if SSH port is reachable:"
-          nc -vz ${{ env.EC2_PUBLIC_IP }} 22
-
-          echo "Trying ssh-keyscan with debug output:"
-          ssh-keyscan -vvv -t rsa ${{ env.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts || true
-
-          echo "Contents of known_hosts:"
-          cat ~/.ssh/known_hosts
-
-          echo "Trying manual SSH connection (debugging):"
-          ssh -vvv -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_PUBLIC_IP }} "echo SSH debugging successful" || true
-
-
-      - name: Debug SSH Connection (optional but recommended)
-        run: |
-          ssh -vvv -o StrictHostKeyChecking=no ubuntu@${{ env.EC2_PUBLIC_IP }} "echo ✅ SSH Works!"
+          ssh-keyscan -H ${{ env.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
 
       - name: Generate Dynamic Inventory File
         run: |
           echo "[ethereum]" > ansible/inventory.ini
           echo "${{ env.EC2_PUBLIC_IP }} ansible_user=ubuntu ansible_ssh_private_key_file=~/.ssh/id_rsa" >> ansible/inventory.ini
-
-      - name: Wait for SSH (Ansible)
-        run: |
-          ansible -i ansible/inventory.ini ethereum -m wait_for_connection -a "timeout=180"
 
       - name: Run Ansible Playbook
         run: |
@@ -102,11 +76,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: 1.5.5
-
       - name: Terraform Destroy
         working-directory: terraform
         env:
