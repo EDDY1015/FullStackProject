@@ -1,4 +1,4 @@
-name: Phase 3 - Deploy Placeholder App
+name: Phase 3 - Deploy the Placeholder App
 
 on:
   push:
