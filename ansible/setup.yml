@@ -6,7 +6,7 @@
   pre_tasks:
     - name: Wait for EC2 to stabilize
       pause:
-        seconds: 15
+        seconds: 10
 
   tasks:
     - name: Install essential packages
