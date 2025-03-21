@@ -1,23 +1,31 @@
-- name: Configure EC2 for Ethereum & Kubernetes
+- name: Configure EC2 for Ethereum & Minikube + Vault
   hosts: all
   become: true
   gather_facts: false
 
   pre_tasks:
-    - name: Wait 10 seconds before connecting (instance stabilization)
+    - name: Wait for EC2 to stabilize
       pause:
         seconds: 10
 
   tasks:
-    - name: Install Docker
+    - name: Install dependencies
       apt:
-        name: docker.io
+        name:
+          - curl
+          - unzip
+          - docker.io
+          - conntrack
+          - socat
+          - ebtables
+          - apt-transport-https
+          - ca-certificates
         state: present
         update_cache: yes
       environment:
         DEBIAN_FRONTEND: noninteractive
 
-    - name: Start Docker service
+    - name: Start and enable Docker
       systemd:
         name: docker
         state: started
@@ -30,7 +38,7 @@
         append: yes
 
     - name: Run Ethereum Geth Node in Docker
-      community.docker.docker_container:
+      docker_container:
         name: ethereum-node
         image: ethereum/client-go
         state: started
@@ -52,35 +60,23 @@
         name: hardhat
         global: yes
 
-    - name: Install K3s (Kubernetes lightweight)
+    - name: Install Minikube
       shell: |
-        curl -sfL https://get.k3s.io | sh -
+        curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
+        install minikube-linux-amd64 /usr/local/bin/minikube
       args:
-        creates: /usr/local/bin/k3s
+        creates: /usr/local/bin/minikube
 
-    - name: Symlink kubectl for ease of use
-      file:
-        src: /usr/local/bin/k3s
-        dest: /usr/local/bin/kubectl
-        state: link
-        force: yes
-
-    - name: Wait for Kubernetes API to become available
-      shell: |
-        for i in {1..20}; do
-          kubectl get nodes && exit 0
-          echo "Waiting for Kubernetes API..."
-          sleep 15
-        done
-        exit 1
-      register: kube_ready
-      retries: 3
-      delay: 10
-      until: kube_ready.rc == 0
+    - name: Start Minikube
+      shell: minikube start --driver=docker
+      environment:
+        CHANGE_MINIKUBE_NONE_USER: "true"
 
     - name: Install Helm
       shell: |
-        curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+        curl https://raw.githubusercontent.com/helm/helm/master/scripts/get-helm-3 | bash
+      args:
+        creates: /usr/local/bin/helm
 
     - name: Add HashiCorp Helm repo
       shell: helm repo add hashicorp https://helm.releases.hashicorp.com
@@ -88,12 +84,13 @@
     - name: Update Helm repos
       shell: helm repo update
 
-    - name: Create vault namespace
+    - name: Create Vault namespace
       shell: kubectl create namespace vault --dry-run=client -o yaml | kubectl apply -f -
 
-    - name: Deploy Vault via Helm (Dev Mode)
-      shell: helm install vault hashicorp/vault --namespace vault --set "server.dev.enabled=true"
-      register: vault_result
-      retries: 3
-      delay: 15
-      until: vault_result.rc == 0
+    - name: Install Vault using Helm (dev mode)
+      shell: |
+        helm install vault hashicorp/vault --namespace vault \
+        --set "server.dev.enabled=true"
+
+    - name: Confirm Vault Pods Running
+      shell: kubectl get pods -n vault
