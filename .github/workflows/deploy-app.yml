@@ -1,39 +1,69 @@
-name: Deploy the App on K3s
+name: Phase 3 - Deploy Placeholder App
 
 on:
-  workflow_run:
-    workflows: ["Terraform & Ansible CI/CD"]
-    types:
-      - completed
+  push:
+    branches:
+      - master
 
 jobs:
   deploy-app:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Repo
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup SSH
+      - name: Set up SSH key and known_hosts
         run: |
+          echo "🔐 Setting up SSH access"
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -H ${{ secrets.EC2_PUBLIC_IP }} >> ~/.ssh/known_hosts
 
-      - name: Deploy App via k8s.yaml
+      - name: Deploy Placeholder App on EC2
         run: |
+          echo "🚀 Deploying app to EC2 (${EC2_PUBLIC_IP})"
           ssh -o StrictHostKeyChecking=no ubuntu@${{ secrets.EC2_PUBLIC_IP }} << 'EOF'
-            echo "🚀 Deploying your placeholder app on K3s..."
+            set -e
+            echo "📦 Writing Kubernetes manifest..."
+            cat << 'YAML' > ~/k8s.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: placeholder-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: placeholder
+  template:
+    metadata:
+      labels:
+        app: placeholder
+    spec:
+      containers:
+        - name: placeholder
+          image: cicd-placeholder-app:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: placeholder-service
+spec:
+  type: NodePort
+  selector:
+    app: placeholder
+  ports:
+    - port: 3000
+      targetPort: 3000
+      nodePort: 30080
+YAML
 
-            # Navigate to app directory (if needed)
-            cd ~/FullStackProject || cd ~/project || true
-
-            # Apply your k8s.yaml file
-            kubectl apply -f k8s.yaml
-
-            echo "✅ App deployment triggered"
-            kubectl get pods
-            kubectl get svc
-          EOF
+            echo "📦 Applying Kubernetes manifest..."
+            kubectl apply -f ~/k8s.yaml
+            echo "✅ App deployed to K3s!"
+EOF
