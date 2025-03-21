@@ -73,10 +73,10 @@
 
     - name: Deploy Placeholder App on K3s
       copy:
-        src: ../app/k8s.yaml
-        dest: /home/ubuntu/k8s.yaml
+        src: ../app/fundraiser.yaml
+        dest: /home/ubuntu/fundraiser.yaml
         mode: '0644'
 
     - name: Apply K8s manifest using kubectl
       shell: |
-        kubectl apply -f /home/ubuntu/k8s.yaml
+        kubectl apply -f /home/ubuntu/fundraiser.yaml
